@@ -1,0 +1,69 @@
+---
+- name: Install Docker on Debian
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Install dependencies
+      apt: update_cache=yes state=latest
+      become: true
+      tags: [dependencies]
+
+    - name: Install packages for Docker
+      apt:
+        name: "{{ packages }}"
+        state: present
+      become: true
+      vars:
+        packages:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg2
+          - software-properties-common
+      tags: [packages]
+
+    - name: Add GPG key for Docker official repository
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        validate_certs: yes
+        state: present
+      become: true
+      tags: [docker-repo-key]
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+        state: present
+      become: true
+      tags: [docker-repo]
+    
+    - name: Install Docker
+      apt:
+        name: "{{ item }}" 
+        state: present
+        update_cache: yes
+      with_items:
+        - docker-ce 
+        - docker-ce-cli 
+        - containerd.io 
+        - docker-buildx-plugin 
+        - docker-compose-plugin
+      become: true
+      tags: [docker-install]
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+        state: present
+      become: true
+      tags: [docker-user]
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      become: true
+      tags: [docker-start]
