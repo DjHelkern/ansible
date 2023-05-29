@@ -1,0 +1,42 @@
+---
+- name: Install MySQL Server
+  hosts: localhost
+  become: true
+  vars:
+    mysql_root_password: "my_secret_password"
+  tasks:
+    - name: Download MySQL APT Config
+      get_url:
+        url: https://repo.mysql.com//mysql-apt-config_0.8.25-1_all.deb 
+        dest: /tmp/mysql-apt-config_0.8.22-1_all.deb
+        headers:
+          User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+      register: download_result
+      until: download_result is succeeded
+
+    - name: Install MySQL APT Config
+      apt:
+        deb: /tmp/mysql-apt-config_0.8.22-1_all.deb
+        update_cache: yes
+      tags: [mysql-config]
+
+    - name: Update APT Cache
+      apt:
+        name: "*"
+        state: latest
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: [apt-cache]
+
+    - name: Install MySQL Server
+      apt:
+        name: mysql-server
+        state: latest
+      tags: [mysql-server]
+
+    - name: Start MySQL Server
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+      tags: [mysql-server]
