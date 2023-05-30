@@ -1,0 +1,6 @@
+- name: Configure nginx and php-fpm on web hosts
+  hosts: debian11
+  become: yes
+
+  roles:
+    - nginx-php-fpm
