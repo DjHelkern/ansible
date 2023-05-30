@@ -1,0 +1,7 @@
+--- 
+- name: Server-vsftpd
+  hosts: RBT_Routers_Devil
+  become: true
+
+  roles:
+  - vsftpd-install
