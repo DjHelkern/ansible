@@ -1,0 +1,129 @@
+---
+- name: Ensure required packages are installed
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - mariadb-server
+      - php-fpm
+      - php-cli
+      - php-mysql
+      - php-zip
+      - php-gd
+      - php-xml
+      - php-mbstring
+      - php-curl
+      - php-intl
+      - php-bcmath
+      - php-gmp
+      - php-imagick
+      - unzip
+      - bzip2
+      - tar
+      - curl
+    state: present
+    update_cache: true
+
+- name: Ensure Nextcloud data directory exists
+  ansible.builtin.file:
+    path: "{{ nextcloud_data_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0750"
+
+- name: Download Nextcloud release
+  ansible.builtin.get_url:
+    url: "{{ nextcloud_download_url }}"
+    dest: /tmp/nextcloud.tar.bz2
+    mode: "0644"
+
+- name: Extract Nextcloud release
+  ansible.builtin.unarchive:
+    src: /tmp/nextcloud.tar.bz2
+    dest: /var/www
+    remote_src: true
+    creates: "{{ nextcloud_install_dir }}"
+  notify: Reload nginx
+
+- name: Ensure Nextcloud directory ownership
+  ansible.builtin.file:
+    path: "{{ nextcloud_install_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: true
+
+- name: Configure PHP for Nextcloud
+  ansible.builtin.template:
+    src: php-nextcloud.ini.j2
+    dest: "/etc/php/{{ nextcloud_php_version }}/fpm/conf.d/90-nextcloud.ini"
+    mode: "0644"
+  notify: Restart php-fpm
+
+- name: Configure Nginx site
+  ansible.builtin.template:
+    src: nginx-nextcloud.conf.j2
+    dest: /etc/nginx/sites-available/nextcloud.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable Nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/nextcloud.conf
+    dest: /etc/nginx/sites-enabled/nextcloud.conf
+    state: link
+  notify: Reload nginx
+
+- name: Disable default Nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Ensure MariaDB is started
+  ansible.builtin.service:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Create Nextcloud database
+  ansible.builtin.command:
+    cmd: >-
+      mysql -e "CREATE DATABASE IF NOT EXISTS {{ nextcloud_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+  changed_when: false
+
+- name: Create Nextcloud database user
+  ansible.builtin.command:
+    cmd: >-
+      mysql -e "CREATE USER IF NOT EXISTS '{{ nextcloud_db_user }}'@'{{ nextcloud_db_host }}' IDENTIFIED BY '{{ nextcloud_db_password }}';"
+  changed_when: false
+
+- name: Grant database permissions
+  ansible.builtin.command:
+    cmd: >-
+      mysql -e "GRANT ALL PRIVILEGES ON {{ nextcloud_db_name }}.* TO '{{ nextcloud_db_user }}'@'{{ nextcloud_db_host }}'; FLUSH PRIVILEGES;"
+  changed_when: false
+
+- name: Install Nextcloud
+  ansible.builtin.command:
+    cmd: >-
+      su -s /bin/sh -c
+      "php {{ nextcloud_install_dir }}/occ maintenance:install
+      --database \"mysql\"
+      --database-name \"{{ nextcloud_db_name }}\"
+      --database-user \"{{ nextcloud_db_user }}\"
+      --database-pass \"{{ nextcloud_db_password }}\"
+      --database-host \"{{ nextcloud_db_host }}\"
+      --admin-user \"{{ nextcloud_admin_user }}\"
+      --admin-pass \"{{ nextcloud_admin_password }}\"
+      --data-dir \"{{ nextcloud_data_dir }}\""
+      www-data
+    creates: "{{ nextcloud_install_dir }}/config/config.php"
+
+- name: Configure trusted domain
+  ansible.builtin.command:
+    cmd: >-
+      su -s /bin/sh -c
+      "php {{ nextcloud_install_dir }}/occ config:system:set trusted_domains 0 --value=\"{{ nextcloud_domain }}\""
+      www-data
+  changed_when: false

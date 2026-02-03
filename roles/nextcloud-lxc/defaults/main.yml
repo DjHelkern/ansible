@@ -1,0 +1,19 @@
+---
+nextcloud_version: "29.0.1"
+nextcloud_download_url: "https://download.nextcloud.com/server/releases/nextcloud-{{ nextcloud_version }}.tar.bz2"
+nextcloud_install_dir: /var/www/nextcloud
+nextcloud_data_dir: /var/www/nextcloud-data
+nextcloud_domain: "nextcloud.local"
+nextcloud_admin_user: admin
+nextcloud_admin_password: "ChangeMe123!"
+
+nextcloud_db_name: nextcloud
+nextcloud_db_user: nextcloud
+nextcloud_db_password: "ChangeMe123!"
+nextcloud_db_host: localhost
+
+nextcloud_php_version: "8.2"
+nextcloud_php_memory_limit: 512M
+nextcloud_php_upload_max_filesize: 1024M
+nextcloud_php_post_max_size: 1024M
+nextcloud_php_max_execution_time: 360
